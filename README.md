@@ -24,7 +24,6 @@ Run each of the following command on a new terminal for each scheduling algorith
 
 ```bash
 $ python router.py
-$ python router.py
 $ python destination.py
 $ python source.py 0
 $ python source.py 1
@@ -32,5 +31,4 @@ $ python source.py 2
 ```
 # Reference:
 [Github Ref](https://github.com/varshit97/Weighted-Fair-Queuing)
-
 
