@@ -30,6 +30,7 @@ $ python source.py 0
 $ python source.py 1
 $ python source.py 2
 ```
-
+# Reference:
+[Github Ref](https://github.com/varshit97/Weighted-Fair-Queuing)
 
 
