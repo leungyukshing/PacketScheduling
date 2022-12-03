@@ -7,10 +7,12 @@ except socket.error:
 	print('Failed to create socket')
 	sys.exit()
  
-host = 'localhost'
-port = 8888
+HOST = 'localhost'
+PORT = 8888
 
-s.sendto(str.encode("-1;dest"), (host, port))
+# send to router to notify the address of myself
+s.sendto(str.encode("-1;dest"), (HOST, PORT))
+
 while True:
 	try:
 		d = s.recvfrom(1024)

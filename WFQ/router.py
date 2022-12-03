@@ -6,6 +6,8 @@ import threading
 HOST = '127.0.0.1'
 PORT = 8888
 
+INT_MAX = 999999999999999
+
 current_milli_time = lambda: int(round(time.time() * 1000))
 
 try:
@@ -22,19 +24,18 @@ except socket.error as msg:
 	sys.exit()
 	
 print('Socket bind complete')
-daddr = None
-roundNumber = 0
-activeConn = 0
+destination_address = None
+round_number = 0 # like real time?
+# activeConn = 0 # UNUSED
 source = {0:{'time':[],'data':[], 'fno':[], 'active':0, 'sent':[0]}, 1:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}, 2:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}}
 packet_size = [100, 50, 100]
 iters = {0:0, 1:0, 2:0}
 count = 0
-numpackets=[2, 4, 1]
-sleeptime=[0.1,0.05,0.1]
-daddr=None
-globalTime = None
-flag = 0
-rDash = 0
+numpackets = [2, 4, 1] # weights
+sleeptime = [0.1,0.05,0.1]
+global_start_time = None # record the first packet arrival time
+flag = 0 # used to initialize states
+rDash = 0 # rate for 
 
 def recvpacket():
 	global source
@@ -42,36 +43,36 @@ def recvpacket():
 	global rDash
 	while True:
 		d = s.recvfrom(1024)
-		recvTime = current_milli_time()
+		recv_time = current_milli_time()
 		d_decoded = d[0].decode()
 		sourcey, data = d_decoded.split(';')
 		sourcey = int(sourcey)
 		print(data)
 		if data == "dest":
-			global daddr
-			daddr= d[1]
-			s.sendto(str.encode("connected"), daddr)
+			global destination_address
+			destination_address = d[1]
+			s.sendto(str.encode("connected"), destination_address)
 			continue
 		if flag == 0:
-			prevTime = 0
-			globalTime = recvTime
-			roundNumber = 0
-			flag = 1
+			prev_time = 0 # arrival time for the previous packet (relative to global)
+			global_start_time = recv_time
+			round_number = 0
+			flag = 1 # initialized
 		if len(source[sourcey]['fno']) == 0:
 			print('First packet')
-			fno = roundNumber + (packet_size[sourcey]*1.0/numpackets[sourcey])
+			fno = round_number + (packet_size[sourcey] * 1.0 / numpackets[sourcey])
 			source[sourcey]['fno'].append(fno)
 		else:
 			print('length', len(source[sourcey]['fno']), 'source', sourcey)
-			fno = max(roundNumber, source[sourcey]['fno'][len(source[sourcey]['fno']) - 1]) + (packet_size[sourcey]*1.0/numpackets[sourcey])
+			fno = max(round_number, source[sourcey]['fno'][len(source[sourcey]['fno']) - 1]) + (packet_size[sourcey] * 1.0 / numpackets[sourcey])
 			source[sourcey]['fno'].append(fno)
-		source[sourcey]['time'].append(recvTime - globalTime)
+		source[sourcey]['time'].append(recv_time - global_start_time)
 		source[sourcey]['data'].append(str(sourcey) + ';' + data)
 		source[sourcey]['sent'].append(0)
-		roundNumber += ((recvTime - globalTime) - prevTime)*rDash
+		round_number += ((recv_time - global_start_time) - prev_time)*rDash
 		lFno = max(source[sourcey]['fno'])
-		print(lFno, roundNumber)
-		if lFno > roundNumber:
+		print(lFno, round_number)
+		if lFno > round_number:
 			source[sourcey]['active'] = 1
 		else:
 			source[sourcey]['active'] = 0
@@ -81,14 +82,14 @@ def recvpacket():
 				weightsSum += numpackets[i]
 		if weightsSum == 0:
 			continue
-		rDash = 1.0/weightsSum
-		prevTime = recvTime - globalTime
-	s.close()
+		rDash = 1.0 / weightsSum
+		prev_time = recv_time - global_start_time
+	# s.close() # code unreachable
 
 def sendpacket():
 	while True:
-		if daddr:
-			mini = 999999999999999
+		if destination_address:
+			mini = INT_MAX
 			index = 0
 			so = 0
 			for i in range(3):
@@ -98,8 +99,8 @@ def sendpacket():
 							mini = min(source[i]['fno'])
 							index = j
 							so = i
-			if mini != 999999999999999:
-				s.sendto(str.encode(source[so]['data'][index]), daddr)
+			if mini != INT_MAX:
+				s.sendto(str.encode(source[so]['data'][index]), destination_address)
 			source[so]['sent'][index] = 1
 			time.sleep(sleeptime[so])
 

@@ -8,17 +8,18 @@ except socket.error:
 	print('Failed to create socket')
 	sys.exit()
  
-host = 'localhost'
-port = 8888
+HOST = 'localhost'
+PORT = 8888
+
 packet_count = [100, 1000, 500]
 packet_interval = [0.200, 0.25, 0.300]
 packet_size = [100, 50, 100]
-i = int(sys.argv[1])
-for j in range(packet_count[i]):
+source_id = int(sys.argv[1])
+for j in range(packet_count[source_id]):
 	try:
-		msg = str(i) + ';vishalisalltimethope' + str(j + 1)
-		s.sendto(str.encode(msg), (host, port))
+		msg = str(source_id) + ';vishalisalltimethope' + str(j + 1)
+		s.sendto(str.encode(msg), (HOST, PORT))
 	except socket.error as msg:
 		print('Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
 		sys.exit()
-	time.sleep(packet_interval[i])
+	time.sleep(packet_interval[source_id])
