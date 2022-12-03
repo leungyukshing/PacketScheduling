@@ -10,18 +10,18 @@ current_milli_time = lambda: int(round(time.time() * 1000))
 
 try:
 	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	print('Socket created')
-except socket.error as msg:
-	print('Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
+	print 'Socket created'
+except socket.error, msg:
+	print 'Failed to create socket. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
 	sys.exit()
 
 try:
 	s.bind((HOST, PORT))
-except socket.error as msg:
-	print('Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1])
+except socket.error , msg:
+	print 'Bind failed. Error Code : ' + str(msg[0]) + ' Message ' + msg[1]
 	sys.exit()
 	
-print('Socket bind complete')
+print 'Socket bind complete'
 daddr = None
 roundNumber = 0
 activeConn = 0
@@ -43,14 +43,13 @@ def recvpacket():
 	while True:
 		d = s.recvfrom(1024)
 		recvTime = current_milli_time()
-		d_decoded = d[0].decode()
-		sourcey, data = d_decoded.split(';')
+		sourcey, data = d[0].split(';')
 		sourcey = int(sourcey)
-		print(data)
+		print data
 		if data == "dest":
 			global daddr
 			daddr= d[1]
-			s.sendto(str.encode("connected"), daddr)
+			s.sendto("connected", daddr)
 			continue
 		if flag == 0:
 			prevTime = 0
@@ -58,11 +57,11 @@ def recvpacket():
 			roundNumber = 0
 			flag = 1
 		if len(source[sourcey]['fno']) == 0:
-			print('First packet')
+			print 'First packet'
 			fno = roundNumber + (packet_size[sourcey]*1.0/numpackets[sourcey])
 			source[sourcey]['fno'].append(fno)
 		else:
-			print('length', len(source[sourcey]['fno']), 'source', sourcey)
+			print 'length', len(source[sourcey]['fno']), 'source', sourcey
 			fno = max(roundNumber, source[sourcey]['fno'][len(source[sourcey]['fno']) - 1]) + (packet_size[sourcey]*1.0/numpackets[sourcey])
 			source[sourcey]['fno'].append(fno)
 		source[sourcey]['time'].append(recvTime - globalTime)
@@ -70,13 +69,13 @@ def recvpacket():
 		source[sourcey]['sent'].append(0)
 		roundNumber += ((recvTime - globalTime) - prevTime)*rDash
 		lFno = max(source[sourcey]['fno'])
-		print(lFno, roundNumber)
+		print lFno, roundNumber
 		if lFno > roundNumber:
 			source[sourcey]['active'] = 1
 		else:
 			source[sourcey]['active'] = 0
 		weightsSum = 0
-		for i in range(3):
+		for i in xrange(3):
 			if source[i]['active'] == 1:
 				weightsSum += numpackets[i]
 		if weightsSum == 0:
@@ -91,15 +90,15 @@ def sendpacket():
 			mini = 999999999999999
 			index = 0
 			so = 0
-			for i in range(3):
-				for j in range(len(source[i]['fno'])):
+			for i in xrange(3):
+				for j in xrange(len(source[i]['fno'])):
 					if source[i]['sent'][j] == 0:
 						if source[i]['fno'][j] < mini:
 							mini = min(source[i]['fno'])
 							index = j
 							so = i
 			if mini != 999999999999999:
-				s.sendto(str.encode(source[so]['data'][index]), daddr)
+				s.sendto(source[so]['data'][index], daddr)
 			source[so]['sent'][index] = 1
 			time.sleep(sleeptime[so])
 
