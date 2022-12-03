@@ -26,16 +26,17 @@ except socket.error as msg:
 print('Socket bind complete')
 destination_address = None
 round_number = 0 # like real time?
-# activeConn = 0 # UNUSED
 source = {0:{'time':[],'data':[], 'fno':[], 'active':0, 'sent':[0]}, 1:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}, 2:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}}
-packet_size = [100, 50, 100]
-iters = {0:0, 1:0, 2:0}
-count = 0
+packet_size = [100, 50, 100] # maybe we should read from the input?
 numpackets = [2, 4, 1] # weights
-sleeptime = [0.1,0.05,0.1]
+sleeptime = [0.1, 0.05, 0.1]
 global_start_time = None # record the first packet arrival time
 flag = 0 # used to initialize states
 rDash = 0 # rate for 
+
+# activeConn = 0 # UNUSED
+# iters = {0:0, 1:0, 2:0} # UNUSED
+# count = 0 # UNUSED
 
 def recvpacket():
 	global source
