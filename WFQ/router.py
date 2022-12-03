@@ -26,13 +26,17 @@ except socket.error as msg:
 print('Socket bind complete')
 destination_address = None
 round_number = 0 # like real time?
-source = {0:{'time':[],'data':[], 'fno':[], 'active':0, 'sent':[0]}, 1:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}, 2:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[0]}}
+source = {0:{'time':[],'data':[], 'fno':[], 'active':0, 'sent':[]}, 1:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[]}, 2:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[]}}
 packet_size = [100, 50, 100] # maybe we should read from the input?
 numpackets = [2, 4, 1] # weights
 sleeptime = [0.1, 0.05, 0.1]
 global_start_time = None # record the first packet arrival time
 flag = 0 # used to initialize states
-rDash = 0 # rate for 
+rDash = 0 # rate for
+
+# metrics variable
+packet_received = 0
+packet_sent = 0
 
 # activeConn = 0 # UNUSED
 # iters = {0:0, 1:0, 2:0} # UNUSED
@@ -42,6 +46,7 @@ def recvpacket():
 	global source
 	global flag
 	global rDash
+	global packet_received
 	while True:
 		d = s.recvfrom(1024)
 		recv_time = current_milli_time()
@@ -54,6 +59,7 @@ def recvpacket():
 			destination_address = d[1]
 			s.sendto(str.encode("connected"), destination_address)
 			continue
+		packet_received += 1
 		if flag == 0:
 			prev_time = 0 # arrival time for the previous packet (relative to global)
 			global_start_time = recv_time
@@ -88,6 +94,7 @@ def recvpacket():
 	# s.close() # code unreachable
 
 def sendpacket():
+	global packet_sent
 	while True:
 		if destination_address:
 			mini = INT_MAX
@@ -101,9 +108,15 @@ def sendpacket():
 							index = j
 							so = i
 			if mini != INT_MAX:
+				print("router send packet flow: {}, index: {}, data: {}".format(so, index, str.encode(source[so]['data'][index])))
 				s.sendto(str.encode(source[so]['data'][index]), destination_address)
-			source[so]['sent'][index] = 1
+				packet_sent += 1
+				source[so]['sent'][index] = 1			
 			time.sleep(sleeptime[so])
+
+def getmetrics():
+	global packet_received
+	global packet_sent
 
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
@@ -112,6 +125,9 @@ t2.daemon = True
 
 t1.start()
 t2.start()
+
+t3 = threading.Thread(target=getmetrics)
+t3.daemon = True
 
 while threading.active_count() > 0:
     time.sleep(0.1)
