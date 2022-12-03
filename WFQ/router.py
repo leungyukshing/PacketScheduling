@@ -42,6 +42,7 @@ packet_sent = 0
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
 
+
 def recvpacket():
 	global source
 	global flag
@@ -76,7 +77,7 @@ def recvpacket():
 		source[sourcey]['time'].append(recv_time - global_start_time)
 		source[sourcey]['data'].append(str(sourcey) + ';' + data)
 		source[sourcey]['sent'].append(0)
-		round_number += ((recv_time - global_start_time) - prev_time)*rDash
+		round_number += ((recv_time - global_start_time) - prev_time) * rDash
 		lFno = max(source[sourcey]['fno'])
 		print(lFno, round_number)
 		if lFno > round_number:
@@ -111,7 +112,7 @@ def sendpacket():
 				print("router send packet flow: {}, index: {}, data: {}".format(so, index, str.encode(source[so]['data'][index])))
 				s.sendto(str.encode(source[so]['data'][index]), destination_address)
 				packet_sent += 1
-				source[so]['sent'][index] = 1			
+				source[so]['sent'][index] = 1
 			time.sleep(sleeptime[so])
 
 def getmetrics():
