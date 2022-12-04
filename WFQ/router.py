@@ -34,10 +34,6 @@ global_start_time = None # record the first packet arrival time
 flag = 0 # used to initialize states
 rDash = 0 # rate for
 
-# metrics variable
-packet_received = 0
-packet_sent = 0
-
 # activeConn = 0 # UNUSED
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
