@@ -134,6 +134,7 @@ leaf_list = [leaf0, leaf1, leaf2]
 
 
 def reset_path(node: Node):
+    # some comment
     node.logic_queue.popleft()
     if isinstance(node, leafNode):
         node.real_queue.popleft()
