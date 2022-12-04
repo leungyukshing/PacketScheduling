@@ -51,14 +51,13 @@ def recvpacket():
         sourcey, data = d_decoded.split(';')
         print(data)
         if data == "dest":
-            global daddr
-            daddr = d[1]
-            s.sendto(str.encode("connected"), daddr)
+            global destination_address
+            destination_address = d[1]
+            s.sendto(str.encode("connected"), destination_address)
         else:
             global source
-            print('debug', sourcey)
             # print('length', len(source[int(sourcey)]), 'source', sourcey)
-            arrive(sourcey, data)
+            arrive(int(sourcey), data)
     # s.close()
 
 
@@ -115,14 +114,22 @@ class leafNode:
         self.Vt = Vt
 
 
-# implement tree 
-tree_root = Node(left=None, right=None, logic_queue=deque(), parent=None)
+# implement tree
+dummy_root = Node(left=None, right=None, logic_queue=deque(), parent=None)
+tree_root = Node(left=None, right=None, logic_queue=deque(), parent=dummy_root)
 node0 =  Node(None, None, deque(), tree_root)
 node1 = Node(None, None, deque(), tree_root)
 
-leaf0   = leafNode(real_queue=deque(), logic_queue=deque(), parent=node0, weight=2)
+
+leaf0 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node0, weight=2)
 leaf1 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node0, weight=4)
 leaf2 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node1, weight=1)
+node0.left = leaf0
+node0.right = leaf1
+node1.left = leaf2
+tree_root.left = node0
+tree_root.right = node1
+dummy_root.left = tree_root
 leaf_list = [leaf0, leaf1, leaf2]
 
 
@@ -130,28 +137,31 @@ def reset_path(node: Node):
     node.logic_queue.popleft()
     if isinstance(node, leafNode):
         node.real_queue.popleft()
-        if not node.real_queue.empty():
+        print(node.real_queue, node.weight)
+        if len(node.real_queue) != 0:
             node.logic_queue.append(node.real_queue[0])
             node.s = node.f
             node.f = node.s + (len(node.logic_queue[0])*1.0 / node.weight) # rn = weight
             restart_node(node.parent)
-        else:
-            m = node.activeChild
-            node.activeChild = None
-            node.weight = 0
-            reset_path(m)    
+    else:
+        m = node.activeChild
+        node.activeChild = None
+        node.weight = 0
+        reset_path(m)
 
 
 def transmit_packet_to_link(node):
+    # set Vt of dummy root
+    node.parent.Vt = node.f
     s.sendto(str.encode(node.logic_queue[0]), destination_address)
     reset_path(node)
     
 
 def select_next(n: Node):
     # this only fit our three leaves nodes tree, looking forward our feature work
-    if not n.right:
+    if not n.right or len(n.right.logic_queue) == 0:
         return n.left
-    if not n.left:
+    if not n.left or len(n.left.logic_queue) == 0:
         return n.right
     if n.left.f <= n.right.f:
         return n.left
@@ -163,32 +173,33 @@ def restart_node(parent_node: Node):
     if len(node_to_schedule.logic_queue):
         # ActiveChildn <- m
         parent_node.activeChild = node_to_schedule
-        parent_node.logic_queue.append(node_to_schedule.logic_queue.popleft())
+        parent_node.logic_queue.append(node_to_schedule.logic_queue[0])
         parent_node.weight = node_to_schedule.weight
         if parent_node.Busy:
             parent_node.s = parent_node.f
         else:
-            parent_node.s = max(parent_node.f, parent_node.V)
-        parent_node.f = parent_node.s + (parent_node.logic_queue[0] * 1.0) / parent_node.weight
+            parent_node.s = max(parent_node.f, parent_node.parent.Vt)
+        parent_node.f = parent_node.s + (len(parent_node.logic_queue[0]) * 1.0) / parent_node.weight
         parent_node.Busy = True
-        # update V(n) to be implemented
-        parent_node.Vt = node_to_schedule.Vt
+        # update V(n)
+        parent_node.Vt = node_to_schedule.f
     else:
-        # ActivateChildn <- 0
+        # ActivateChild <- 0
         parent_node.activeChild = None
         parent_node.Busy = False
-    if parent_node != tree_root and not parent_node.parent.logic_queue:
+    if parent_node != tree_root and len(parent_node.parent.logic_queue) == 0:
         restart_node(parent_node.parent)
-    if parent_node == tree_root and not tree_root.logic_queue:
-        transmit_packet_to_link(parent_node.logic_queue)
-
+    if parent_node == tree_root and len(tree_root.logic_queue) != 0:
+        transmit_packet_to_link(parent_node)
 
 
 def arrive(i, packet):
+    print(i, 'pkt arrived')
     global tree_root 
     leaf_node = leaf_list[i]
     parent_node = leaf_node.parent
     leaf_node.real_queue.append(packet)
+    print(leaf_node.real_queue)
     if len(leaf_node.logic_queue):
         return
     leaf_node.logic_queue.append(packet)
@@ -203,11 +214,11 @@ def arrive(i, packet):
     
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
-t2 = threading.Thread(target=sendpacket)
-t2.daemon = True
+# t2 = threading.Thread(target=sendpacket)
+# t2.daemon = True
 
 t1.start()
-t2.start()
+# t2.start()
 
 while threading.active_count() > 0:
     time.sleep(0.1)
