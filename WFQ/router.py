@@ -34,10 +34,6 @@ global_start_time = None # record the first packet arrival time
 flag = 0 # used to initialize states
 rDash = 0 # rate for
 
-# metrics variable
-packet_received = 0
-packet_sent = 0
-
 # activeConn = 0 # UNUSED
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
@@ -93,7 +89,7 @@ def recvpacket():
 		source[sourcey]['time'].append(recv_time - global_start_time)
 		source[sourcey]['data'].append(str(sourcey) + ';' + data)
 		source[sourcey]['sent'].append(0)
-		round_number += ((recv_time - global_start_time) - prev_time)*rDash
+		round_number += ((recv_time - global_start_time) - prev_time) * rDash
 		lFno = max(source[sourcey]['fno'])
 		print("last fno for source {}: {}, round_number: {}".format(sourcey, lFno, round_number))
 		if lFno > round_number:
