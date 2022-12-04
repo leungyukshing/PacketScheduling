@@ -30,7 +30,7 @@ source = {0: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligi
           1: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligibility': []},
           2: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligibility': []}}
 packet_size = [100, 50, 100]  # maybe we should read from the input?
-numpackets = [2, 4, 1]  # weights
+numpackets = [1, 1, 1]  # weights
 sleeptime = [0.1, 0.05, 0.1]
 global_start_time = None  # record the first packet arrival time
 flag = 0  # used to initialize states
@@ -45,6 +45,24 @@ packet_sent = 0
 # activeConn = 0 # UNUSED
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
+
+# Send Rate Control
+
+# We'll limit ourself to a 60B/sec maximum send rate
+maxSendRateBytesPerSecond = 60
+
+# We'll add to this tally as we send() bytes, and subtract from
+# at the schedule specified by (maxSendRateBytesPerSecond)
+bytesAheadOfSchedule = 0
+
+prev_send_time = None
+
+def ConvertSecondsToBytes(numSeconds):
+   return numSeconds*maxSendRateBytesPerSecond
+
+def ConvertBytesToSeconds(numBytes):
+   return float(numBytes)/maxSendRateBytesPerSecond
+
 
 def refresh_eligibility():
     for i in range(3):
@@ -67,6 +85,7 @@ def recvpacket():
     global flag
     global rDash
     global realT
+    global packet_received
     while True:
         d = s.recvfrom(1024)
         recv_time = current_milli_time()
@@ -79,17 +98,18 @@ def recvpacket():
             destination_address = d[1]
             s.sendto(str.encode("connected"), destination_address)
             continue
+        packet_received += 1
         if flag == 0:
             prev_time = 0  # arrival time for the previous packet (relative to global)
             global_start_time = recv_time
             round_number = 0
             flag = 1  # initialized
         if len(source[sourcey]['fno']) == 0:
-            print('First packet')
+            print('first packet')
             fno = round_number + (packet_size[sourcey] * 1.0 / numpackets[sourcey])
             source[sourcey]['fno'].append(fno)
         else:
-            print('length', len(source[sourcey]['fno']), 'source', sourcey)
+            print("source_number: {}, packet_length: {}".format(sourcey, len(source[sourcey]['fno'])))
             fno = max(round_number, source[sourcey]['fno'][len(source[sourcey]['fno']) - 1]) + (
                         packet_size[sourcey] * 1.0 / numpackets[sourcey])
             source[sourcey]['fno'].append(fno)
@@ -103,7 +123,7 @@ def recvpacket():
 
         round_number += ((recv_time - global_start_time) - prev_time) * rDash
         lFno = max(source[sourcey]['fno'])
-        print(lFno, round_number)
+        print("last fno for source {}: {}, round_number: {}".format(sourcey, lFno, round_number))
         if lFno > round_number:
             source[sourcey]['active'] = 1
         else:
@@ -121,6 +141,9 @@ def recvpacket():
 # s.close() # code unreachable
 
 def sendpacket():
+    global packet_sent
+    global prev_send_time
+    global bytesAheadOfSchedule
     global realT
     while True:
         if destination_address:
@@ -131,24 +154,59 @@ def sendpacket():
                 for j in range(len(source[i]['fno'])):
                     if source[i]['sent'][j] == 0 and source[i]['eligibility'][j] == 1:
                         if source[i]['fno'][j] < mini:
-                            # mini = min(source[i]['fno'])
                             mini = source[i]['fno'][j]
                             index = j
                             so = i
             if mini != INT_MAX:
-                s.sendto(str.encode(source[so]['data'][index]), destination_address)
+                print("router send packet flow: {}, index: {}, data: {}".format(so, index, str.encode(source[so]['data'][index])))
+
+                now = time.time()
+                if prev_send_time != None:
+                    bytesAheadOfSchedule -= ConvertSecondsToBytes(now - prev_send_time)
+                prev_send_time = now
+
+                numBytesSent = s.sendto(str.encode(source[so]['data'][index]), destination_address)
+                if (numBytesSent > 0):
+                    bytesAheadOfSchedule += numBytesSent
+                    if (bytesAheadOfSchedule > 0):
+                        print("router sleep {}".format(bytesAheadOfSchedule))
+                        time.sleep(ConvertBytesToSeconds(bytesAheadOfSchedule))
+                else:
+                    print("Error sending data, exiting!")
+                    break
+                print("router send packet done. packet_received: {}, packet_send: {}".format(packet_received, packet_sent))
+                packet_sent += 1
                 realT += packet_size[so]
                 source[so]['sent'][index] = 1
-            time.sleep(sleeptime[so])
+            # time.sleep(sleeptime[so])
 
+def getmetrics():
+	global packet_received
+	global packet_sent
+	total_throughput = 0.0
+	total = 0
+	while True:
+		# log every 500 ms
+		if packet_received == 1600:
+			break
+		throughput = 0 if packet_received == 0 else packet_sent / packet_received
+		if throughput > 0:
+			total += 1
+			total_throughput += throughput
+
+		print("[STAT] packet_received: {}, packet_sent: {}, throughput(sent/received): {}, avg_throughput: {}".format(packet_received, packet_sent, throughput, 0 if total == 0 else total_throughput / total))
+		time.sleep(0.5)
 
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
 t2 = threading.Thread(target=sendpacket)
 t2.daemon = True
+t3 = threading.Thread(target=getmetrics)
+t3.daemon = True
 
 t1.start()
 t2.start()
+t3.start()
 
 while threading.active_count() > 0:
     time.sleep(0.1)
