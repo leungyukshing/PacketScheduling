@@ -56,7 +56,7 @@ def recvpacket():
             s.sendto(str.encode("connected"), destination_address)
         else:
             global source
-            # print('length', len(source[int(sourcey)]), 'source', sourcey)
+            print('length:', len(leaf_list[int(sourcey)].real_queue), 'source:', sourcey)
             arrive(int(sourcey), data)
     # s.close()
 
@@ -138,12 +138,11 @@ def reset_path(node: Node):
     node.logic_queue.popleft()
     if isinstance(node, leafNode):
         node.real_queue.popleft()
-        print(node.real_queue, node.weight)
         if len(node.real_queue) != 0:
             node.logic_queue.append(node.real_queue[0])
             node.s = node.f
             node.f = node.s + (len(node.logic_queue[0])*1.0 / node.weight) # rn = weight
-            restart_node(node.parent)
+        restart_node(node.parent)
     else:
         m = node.activeChild
         node.activeChild = None
@@ -195,12 +194,10 @@ def restart_node(parent_node: Node):
 
 
 def arrive(i, packet):
-    print(i, 'pkt arrived')
     global tree_root 
     leaf_node = leaf_list[i]
     parent_node = leaf_node.parent
     leaf_node.real_queue.append(packet)
-    print(leaf_node.real_queue)
     if len(leaf_node.logic_queue):
         return
     leaf_node.logic_queue.append(packet)
@@ -209,10 +206,7 @@ def arrive(i, packet):
     if not parent_node.Busy:
         restart_node(parent_node)
 
-
-
-
-    
+ 
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
 # t2 = threading.Thread(target=sendpacket)
