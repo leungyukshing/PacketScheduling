@@ -131,7 +131,8 @@ def sendpacket():
                 for j in range(len(source[i]['fno'])):
                     if source[i]['sent'][j] == 0 and source[i]['eligibility'][j] == 1:
                         if source[i]['fno'][j] < mini:
-                            mini = min(source[i]['fno'])
+                            # mini = min(source[i]['fno'])
+                            mini = source[i]['fno'][j]
                             index = j
                             so = i
             if mini != INT_MAX:
