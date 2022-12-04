@@ -27,9 +27,9 @@ bytesAheadOfSchedule = 0
 
 prev_send_time = None
 
-packet_count = [100, 1000, 500]
+packet_count = [300, 300, 300]
 packet_interval = [0.200, 0.25, 0.300]
-packet_size = [100, 50, 100]
+packet_size = [30, 50, 100]
 source_id = int(sys.argv[1])
 for j in range(packet_count[source_id]):
 	try:

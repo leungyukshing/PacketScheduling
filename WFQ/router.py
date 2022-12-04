@@ -27,8 +27,8 @@ print('Socket bind complete')
 destination_address = None
 round_number = 0 # like real time?
 source = {0:{'time':[],'data':[], 'fno':[], 'active':0, 'sent':[]}, 1:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[]}, 2:{'time':[], 'data':[], 'fno':[], 'active':0, 'sent':[]}}
-packet_size = [100, 50, 100] # maybe we should read from the input?
-numpackets = [1, 1, 1] # weights
+packet_size = [30, 50, 100] # maybe we should read from the input?
+numpackets = [2, 4, 1] # weights
 sleeptime = [0.1, 0.05, 0.1]
 global_start_time = None # record the first packet arrival time
 flag = 0 # used to initialize states
