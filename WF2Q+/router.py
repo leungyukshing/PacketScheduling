@@ -27,9 +27,6 @@ except socket.error as msg:
 print('Socket bind complete')
 destination_address = None
 round_number = 0
-source = {0: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligibility': []},
-          1: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligibility': []},
-          2: {'time': [], 'data': [], 'fno': [], 'active': 0, 'sent': [], 'eligibility': []}}
 packet_size = [100, 50, 100]  # maybe we should read from the input?
 numpackets = [2, 4, 1]  # weights
 sleeptime = [0.1, 0.05, 0.1]
@@ -47,79 +44,23 @@ packet_sent = 0
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
 
-def refresh_eligibility():
-    for i in range(3):
-        for j in range(len(source[i]['fno'])):
-            if source[i]['eligibility'][j] == 0:
-                stV = source[i]['fno'][j] - (packet_size[i] * 1.0 / numpackets[i])
-                GPST = 0
-                for p in range(3):
-                    for q in range(len(source[i]['fno'])):
-                        if stV >= source[i]['fno'][j]:
-                            GPST += packet_size[i]
-                        else:
-                            GPST += max(packet_size[i] - (source[i]['fno'][j] - stV) * numpackets[i], 0)
-                if GPST <= realT:
-                    source[i]['eligibility'][j] = 1
-
-
 def recvpacket():
-    global source
-    global flag
-    global rDash
-    global realT
     while True:
         d = s.recvfrom(1024)
-        recv_time = current_milli_time()
         d_decoded = d[0].decode()
         sourcey, data = d_decoded.split(';')
-        sourcey = int(sourcey)
         print(data)
         if data == "dest":
-            global destination_address
-            destination_address = d[1]
-            s.sendto(str.encode("connected"), destination_address)
-            continue
-        if flag == 0:
-            prev_time = 0  # arrival time for the previous packet (relative to global)
-            global_start_time = recv_time
-            round_number = 0
-            flag = 1  # initialized
-        if len(source[sourcey]['fno']) == 0:
-            print('First packet')
-            fno = round_number + (packet_size[sourcey] * 1.0 / numpackets[sourcey])
-            source[sourcey]['fno'].append(fno)
+            global daddr
+            daddr = d[1]
+            s.sendto(str.encode("connected"), daddr)
         else:
-            print('length', len(source[sourcey]['fno']), 'source', sourcey)
-            fno = max(round_number, source[sourcey]['fno'][len(source[sourcey]['fno']) - 1]) + (
-                        packet_size[sourcey] * 1.0 / numpackets[sourcey])
-            source[sourcey]['fno'].append(fno)
+            global source
+            print('debug', sourcey)
+            # print('length', len(source[int(sourcey)]), 'source', sourcey)
+            arrive(sourcey, data)
+    # s.close()
 
-        source[sourcey]['time'].append(recv_time - global_start_time)
-        source[sourcey]['data'].append(str(sourcey) + ';' + data)
-        source[sourcey]['sent'].append(0)
-        # compute eligiblity
-        source[sourcey]['eligibility'].append(0)
-        refresh_eligibility()
-
-        round_number += ((recv_time - global_start_time) - prev_time) * rDash
-        lFno = max(source[sourcey]['fno'])
-        print(lFno, round_number)
-        if lFno > round_number:
-            source[sourcey]['active'] = 1
-        else:
-            source[sourcey]['active'] = 0
-        weightsSum = 0
-        for i in range(3):
-            if source[i]['active'] == 1:
-                weightsSum += numpackets[i]
-        if weightsSum == 0:
-            continue
-        rDash = 1.0 / weightsSum
-        prev_time = recv_time - global_start_time
-
-
-# s.close() # code unreachable
 
 def sendpacket():
     global realT
@@ -218,9 +159,9 @@ def select_next(n: Node):
         return n.right
 
 def restart_node(parent_node: Node):
-    node_to_schedule =  select_next(parent_node)
+    node_to_schedule = select_next(parent_node)
     if len(node_to_schedule.logic_queue):
-        # ActiveChildn <- m to be implemented
+        # ActiveChildn <- m
         parent_node.activeChild = node_to_schedule
         parent_node.logic_queue.append(node_to_schedule.logic_queue.popleft())
         parent_node.weight = node_to_schedule.weight
@@ -232,9 +173,9 @@ def restart_node(parent_node: Node):
         parent_node.Busy = True
         # update V(n) to be implemented
         parent_node.Vt = node_to_schedule.Vt
-
     else:
-        # ActivateChildn <- 0 to be implemented
+        # ActivateChildn <- 0
+        parent_node.activeChild = None
         parent_node.Busy = False
     if parent_node != tree_root and not parent_node.parent.logic_queue:
         restart_node(parent_node.parent)
@@ -243,25 +184,18 @@ def restart_node(parent_node: Node):
 
 
 
-    
-
 def arrive(i, packet):
     global tree_root 
     leaf_node = leaf_list[i]
     parent_node = leaf_node.parent
-    leaf_node.real_queue.put(packet)
-    if not leaf_node.logic_queue.empty():
+    leaf_node.real_queue.append(packet)
+    if len(leaf_node.logic_queue):
         return
-    leaf_node.logic_queue.put(packet)
+    leaf_node.logic_queue.append(packet)
     leaf_node.s = max(leaf_node.f, parent_node.Vt)
     leaf_node.f = leaf_node.s + ((len(leaf_node.logic_queue[0]) * 1.0) / leaf_node.weight)
     if not parent_node.Busy:
         restart_node(parent_node)
-
-
-
- 
-
 
 
 
