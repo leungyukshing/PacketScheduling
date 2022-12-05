@@ -31,10 +31,6 @@ round_number = 0
 packet_size = [100, 50, 100]  # maybe we should read from the input?
 numpackets = [2, 4, 1]  # weights
 sleeptime = [0.1, 0.05, 0.1]
-global_start_time = None  # record the first packet arrival time
-flag = 0  # used to initialize states
-rDash = 0  # rate for
-realT = 0 #current real time
 
 # metrics variable
 packet_received = 0
