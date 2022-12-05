@@ -30,10 +30,7 @@ round_number = 0
 packet_size = [100, 50, 100]  # maybe we should read from the input?
 numpackets = [2, 4, 1]  # weights
 sleeptime = [0.1, 0.05, 0.1]
-global_start_time = None  # record the first packet arrival time
-flag = 0  # used to initialize states
-rDash = 0  # rate for
-realT = 0 #current real time
+
 
 # metrics variable
 packet_received = 0
@@ -59,27 +56,6 @@ def recvpacket():
             print('length:', len(leaf_list[int(sourcey)].real_queue), 'source:', sourcey)
             arrive(int(sourcey), data)
     # s.close()
-
-
-def sendpacket():
-    global realT
-    while True:
-        if destination_address:
-            mini = INT_MAX
-            index = 0
-            so = 0
-            for i in range(3):
-                for j in range(len(source[i]['fno'])):
-                    if source[i]['sent'][j] == 0 and source[i]['eligibility'][j] == 1:
-                        if source[i]['fno'][j] < mini:
-                            mini = min(source[i]['fno'])
-                            index = j
-                            so = i
-            if mini != INT_MAX:
-                s.sendto(str.encode(source[so]['data'][index]), destination_address)
-                realT += packet_size[so]
-                source[so]['sent'][index] = 1
-            time.sleep(sleeptime[so])
 
 
 # Hierarchical Packet Fair Queueing Algorithms
@@ -209,8 +185,6 @@ def arrive(i, packet):
  
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
-# t2 = threading.Thread(target=sendpacket)
-# t2.daemon = True
 
 t1.start()
 # t2.start()
