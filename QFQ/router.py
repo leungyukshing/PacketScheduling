@@ -3,6 +3,7 @@ import sys
 import time
 import threading
 from collections import deque
+from collections import defaultdict
 
 HOST = '127.0.0.1'
 PORT = 8888
@@ -44,6 +45,13 @@ packet_sent = 0
 # iters = {0:0, 1:0, 2:0} # UNUSED
 # count = 0 # UNUSED
 
+ER = 0
+EB = 1
+IR = 2
+IB = 3
+IDLE = 4
+
+
 def recvpacket():
     while True:
         d = s.recvfrom(1024)
@@ -56,8 +64,9 @@ def recvpacket():
             s.sendto(str.encode("connected"), destination_address)
         else:
             global source
-            print('length:', len(leaf_list[int(sourcey)].real_queue), 'source:', sourcey)
-            arrive(int(sourcey), data)
+            # print('length:', len(leaf_list[int(sourcey)].real_queue), 'source:', sourcey)
+            packet = Packet(sourcey, data, packet_size[sourcey])
+            enque(packet, flows_qfq[sourcey])
     # s.close()
 
 
@@ -65,175 +74,162 @@ def sendpacket():
     global realT
     while True:
         if destination_address:
-            mini = INT_MAX
-            index = 0
-            so = 0
-            for i in range(3):
-                for j in range(len(source[i]['fno'])):
-                    if source[i]['sent'][j] == 0 and source[i]['eligibility'][j] == 1:
-                        if source[i]['fno'][j] < mini:
-                            mini = min(source[i]['fno'])
-                            index = j
-                            so = i
-            if mini != INT_MAX:
-                s.sendto(str.encode(source[so]['data'][index]), destination_address)
-                realT += packet_size[so]
-                source[so]['sent'][index] = 1
-            time.sleep(sleeptime[so])
-
-
-# Hierarchical Packet Fair Queueing Algorithms
-# real queue of flow i 
-
-#              (link)root(pfq) 
-#                /         \
-#        node0(pfq)        node1(pfq)
-#         /     \             /
-#  leaf(flow0) leaf(flow1) leaf(flow2)
-class Node:
-    def __init__(self, left, right, logic_queue, parent, weight=0, s=0, f=0 ,Vt=0, Busy=False, activeChild=None):
-        self.left = left
-        self.right = right
-        self.logic_queue = logic_queue
-        self.parent = parent
-        self.weight = weight
-        self.s = s
-        self.f = f
-        self.Vt = Vt
-        self.Busy = Busy
-        self.activeChild = activeChild
-
-class leafNode:
-    def __init__(self, real_queue, logic_queue, parent, weight=1, s=0, f=0 ,Vt=0):
-        self.real_queue = real_queue
-        self.logic_queue = logic_queue
-        self.parent = parent
-        self.weight = weight
-        self.s = s
-        self.f = f
-        self.Vt = Vt
-
-
-# implement tree
-dummy_root = Node(left=None, right=None, logic_queue=deque(), parent=None)
-tree_root = Node(left=None, right=None, logic_queue=deque(), parent=dummy_root)
-node0 =  Node(None, None, deque(), tree_root)
-node1 = Node(None, None, deque(), tree_root)
-
-
-leaf0 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node0, weight=2)
-leaf1 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node0, weight=4)
-leaf2 = leafNode(real_queue=deque(), logic_queue=deque(), parent=node1, weight=1)
-node0.left = leaf0
-node0.right = leaf1
-node1.left = leaf2
-tree_root.left = node0
-tree_root.right = node1
-dummy_root.left = tree_root
-leaf_list = [leaf0, leaf1, leaf2]
-
-
-def reset_path(node: Node):
-    # some comment
-    node.logic_queue.popleft()
-    if isinstance(node, leafNode):
-        node.real_queue.popleft()
-        if len(node.real_queue) != 0:
-            node.logic_queue.append(node.real_queue[0])
-            node.s = node.f
-            node.f = node.s + (len(node.logic_queue[0])*1.0 / node.weight) # rn = weight
-        restart_node(node.parent)
-    else:
-        m = node.activeChild
-        node.activeChild = None
-        node.weight = 0
-        reset_path(m)
-
-
-def transmit_packet_to_link(node):
-    # set Vt of dummy root
-    node.parent.Vt = node.f
-    s.sendto(str.encode(node.logic_queue[0]), destination_address)
-    reset_path(node)
-    
-
-def select_next(n: Node):
-    # this only fit our three leaves nodes tree, looking forward our feature work
-    if not n.right or len(n.right.logic_queue) == 0:
-        return n.left
-    if not n.left or len(n.left.logic_queue) == 0:
-        return n.right
-    if n.left.f <= n.right.f:
-        return n.left
-    else:
-        return n.right
-
-def restart_node(parent_node: Node):
-    node_to_schedule = select_next(parent_node)
-    if len(node_to_schedule.logic_queue):
-        # ActiveChildn <- m
-        parent_node.activeChild = node_to_schedule
-        parent_node.logic_queue.append(node_to_schedule.logic_queue[0])
-        parent_node.weight = node_to_schedule.weight
-        if parent_node.Busy:
-            parent_node.s = parent_node.f
-        else:
-            parent_node.s = max(parent_node.f, parent_node.parent.Vt)
-        parent_node.f = parent_node.s + (len(parent_node.logic_queue[0]) * 1.0) / parent_node.weight
-        parent_node.Busy = True
-        # update V(n)
-        parent_node.Vt = node_to_schedule.f
-    else:
-        # ActivateChild <- 0
-        parent_node.activeChild = None
-        parent_node.Busy = False
-    if parent_node != tree_root and len(parent_node.parent.logic_queue) == 0:
-        restart_node(parent_node.parent)
-    if parent_node == tree_root and len(tree_root.logic_queue) != 0:
-        transmit_packet_to_link(parent_node)
-
-
-def arrive(i, packet):
-    global tree_root 
-    leaf_node = leaf_list[i]
-    parent_node = leaf_node.parent
-    leaf_node.real_queue.append(packet)
-    if len(leaf_node.logic_queue):
-        return
-    leaf_node.logic_queue.append(packet)
-    leaf_node.s = max(leaf_node.f, parent_node.Vt)
-    leaf_node.f = leaf_node.s + ((len(leaf_node.logic_queue[0]) * 1.0) / leaf_node.weight)
-    if not parent_node.Busy:
-        restart_node(parent_node)
-
+            packet = packet_deque()
+            s.sendto(str.encode(packet.data), destination_address)
+            time.sleep(sleeptime[packet.source])
 
 
 class Flow:
-    def __init__(self, weight) -> None:
-        self.s = 0
-        self.f = 0
-        self.V = 0
-        self.queue = deque()
-        self.group = None
+    def __init__(self, s: 0, f: 0, queue, group_id: 0, weight: 0) -> None:
+        self.s = s
+        self.f = f
+        self.queue = queue
+        self.group_id = group_id
         self.weight = weight
+
+class Group:
+    def __init__(self,s: 0, f: 0, id, buckets) -> None:
+        self.s = s
+        self.f = f
+        self.id = id
+        self.buckets = buckets
+
+class Packet:
+    def __init__(self, source, data, length) -> None:
+        self.source = source
+        self.data = data
+        self.length = length
+
+
+# initialize 32 groups
+groups = []
+for i in range(32):
+    buckets = defaultdict(deque)
+    groups.append(Group(0, 0, i, buckets))
+set = {ER: 0, EB: 0, IR: 0, IB: 0}
+V = 0
 
 
 
 flows_qfq = [Flow(weight=2),  Flow(weight=4), Flow(weight=1)]
 
-#i : flow index
-def enque(i, package):
-    flow = flows_qfq[i]
-    flow.queue.append(package)
-    if (flow.queue[0]!=package):
+
+def bucket_insert(flow, g):
+    return
+
+
+def ffs(x):
+    if x == 0:
+        return None
+    return (x & ~x).bit_length()() - 1
+
+def ffs_from(x, index):
+    x >> index
+    return ffs(x) + index
+
+def fls(x):
+    n = 32
+
+    if x == 0:
+        return -1
+    if x & 0xFFFF0000 == 0:
+        x <<= 16
+        n -= 16
+    if x & 0xF0000000 == 0:
+        x <<= 8
+        n -= 8
+    if x & 0xC0000000 == 0:
+        x <<= 2
+        n -= 2
+    if x & 0x80000000 == 0:
+        x <<= 1
+        n -= 1
+    return n - 1
+
+
+def bucket_head_remove(buckets):
+    buckets[min(buckets.keys())].queue.popleft()
+
+def enque(packet: Packet, flow: Flow):
+    global V
+    flow.queue.append(packet)
+    if len(flow.queue) != 1:
         return
-    flow.s = max(flow.f, flow.V)
-    flow.f = flow.s + len(package) * 1.0 /     
+    flow.s = max(flow.f, V)
+    flow.f = flow.s + packet.length * 1.0 / flow.weight
+    g = groups[flow.group_id]
+    if (len(g.buckets[min(g.buckets.keys())].queue) == 0 or flow.s < g.s): # to be inplemented !!!!!!!!!!
+        set[IR] &= ~(1 << g.id)
+        set[IB] &= ~(1 << g.id)
+        g.s = flow.s & ~(2 ** g.id - 1)
+        g.f = g.s + 2 * (2 ** g.id)
+    bucket_insert(flow, g)
+
+    if set[ER] == 0 and V < g.s:
+        V = g.s
+    state = compute_group_state(g)
+    set[state] |= 1 << g.id
 
 
+def compute_group_state(g):
+    s = ER if g.s <= V else EB
+    x = ffs_from(set[ER], g.id)
+    s = s + IB if x != None and groups[x].F < g.F else s + IR
+    return s
+
+def packet_deque():
+    global V
+    if set[ER] == 0:
+        return
+    g = groups[ffs(set[ER])]
+    flow = bucket_head_remove(g.buckets)
+    packet = flow.queue.popleft()
+
+    flow.s = flow.f
+    if len(flow.queue) != 0:
+        p = flow.queue[0]
+        flow.f = flow.s + p.length / flow.weight
+        bucket_insert(flow. g)
+
+    old_V = V
+    V += packet.length
+    old_F = g.F
+    if len(g.buckets[min(g.buckets.keys())].queue) == 0:
+        state = IDLE
+    else:
+        g.s = g.buckets[min(g.buckets.keys())].s
+        g.f = g.buckets[min(g.buckets.keys())].f
+        state = compute_group_state(g)
+
+    if state == IDLE or g.f > old_F:
+        set[ER] &= ~(1 << g.id)
+        set[state] |= 1 << g.id
+        unblock_groups(g.id, old_F)
+
+    x = set[ER] | set[IB]
+    if x != 0:
+        if set[ER] == 0:
+            V = max(V, groups[ffs(x)].s)
+        make_eligible(old_V, V)
+    return packet
+
+def move_groups(mask, src, dest):
+    set[dest] |= set[src] & mask
+    set[src] &= ~(set[src] & mask)
+
+def make_eligible(V1, V2):
+    i = fls(V1 ^ V2)
+    mask = (1 << (i + 1)) - 1
+    move_groups(mask, IR, ER)
+    move_groups(mask, IB, EB)
 
 
-
+def unblock_groups(i, old_F):
+    x = ffs(set[ER])
+    if x == None or groups[x].F > old_F:
+        mask = (1 << i) - 1
+        move_groups(mask, EB, ER)
+        move_groups(mask, IB, IR)
 
 
  
