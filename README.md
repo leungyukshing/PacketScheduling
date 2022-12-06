@@ -1,5 +1,12 @@
 # CS7260 Final Project: Queuing-Algorithms
 
+# Contributors
+
++ Jingjing Ye (jye312@gatech.edu)
++ Chengde Xu (cdxu147@gmail.com)
++ Yucheng Liang (yliang350@gatech.edu)
++ Chukang Zhong (zhongchukang5@gmail.com)
+
 # File Structure
 
 ```
