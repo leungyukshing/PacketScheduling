@@ -30,10 +30,7 @@ round_number = 0
 packet_size = [30, 50, 100]  # maybe we should read from the input?
 numpackets = [2, 4, 1]  # weights
 sleeptime = [0.1, 0.05, 0.1]
-global_start_time = None  # record the first packet arrival time
-flag = 0  # used to initialize states
-rDash = 0  # rate for
-realT = 0 #current real time
+
 
 # metrics variable
 packet_received = 0
@@ -79,44 +76,6 @@ def recvpacket():
             print('length:', len(leaf_list[int(sourcey)].real_queue), 'source:', sourcey)
             arrive(int(sourcey), (sourcey, data))
     # s.close()
-
-
-def sendpacket():
-    global packet_sent
-    global prev_send_time
-    global bytesAheadOfSchedule
-    global realT
-    while True:
-        if destination_address:
-            mini = INT_MAX
-            index = 0
-            so = 0
-            for i in range(3):
-                for j in range(len(source[i]['fno'])):
-                    if source[i]['sent'][j] == 0 and source[i]['eligibility'][j] == 1:
-                        if source[i]['fno'][j] < mini:
-                            mini = min(source[i]['fno'])
-                            index = j
-                            so = i
-            if mini != INT_MAX:
-                now = time.time()
-                if prev_send_time != None:
-                    bytesAheadOfSchedule -= ConvertSecondsToBytes(now - prev_send_time)
-                prev_send_time = now
-
-                numBytesSent = s.sendto(str.encode(source[so]['data'][index]), destination_address)
-                if (numBytesSent > 0):
-                    bytesAheadOfSchedule += numBytesSent
-                    if (bytesAheadOfSchedule > 0):
-                        print("router sleep {}".format(bytesAheadOfSchedule))
-                        time.sleep(ConvertBytesToSeconds(bytesAheadOfSchedule))
-                else:
-                    print("Error sending data, exiting!")
-                    break
-                packet_sent += 1
-                realT += packet_size[so]
-                source[so]['sent'][index] = 1
-            # time.sleep(sleeptime[so])
 
 
 # Hierarchical Packet Fair Queueing Algorithms
@@ -281,8 +240,7 @@ def getmetrics():
 
 t1 = threading.Thread(target=recvpacket)
 t1.daemon = True
-# t2 = threading.Thread(target=sendpacket)
-# t2.daemon = True
+
 t3 = threading.Thread(target=getmetrics)
 t3.daemon = True
 
